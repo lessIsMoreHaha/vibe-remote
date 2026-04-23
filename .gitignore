@@ -29,6 +29,7 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+!vibe-remote.spec
 
 # Installer logs
 pip-log.txt
