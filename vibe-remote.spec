@@ -81,6 +81,12 @@ hiddenimports = [
     'apscheduler.triggers.cron',
     'markdown_to_mrkdwn',
     'typing_extensions',
+    # cryptography (used by WeChat CDN AES/PKCS7)
+    'cryptography',
+    'cryptography.hazmat',
+    'cryptography.hazmat.primitives',
+    'cryptography.hazmat.primitives.padding',
+    'cryptography.hazmat.primitives.ciphers',
     # pycryptodome (used by some SDKs)
     'Crypto',
     'Crypto.Cipher',
