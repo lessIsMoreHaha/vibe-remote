@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 import sys
@@ -137,6 +137,45 @@ def test_session_handler_passes_configured_claude_cli_path(monkeypatch, tmp_path
     assert controller.claude_sessions[f"slack_C123:{tmp_path}"] is client
     assert getattr(client, "_vibe_runtime_base_session_id") == "slack_C123"
     assert getattr(client, "_vibe_runtime_session_key") == f"slack_C123:{tmp_path}"
+
+
+def test_session_handler_prefers_packaged_windows_claude_exe_for_default_command(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class _StubClaudeSDKClient:
+        def __init__(self, options):
+            captured["options"] = options
+
+        async def connect(self) -> None:
+            captured["connected"] = True
+
+    monkeypatch.setattr(session_handler_module, "ClaudeAgentOptions", _StubClaudeAgentOptions)
+    monkeypatch.setattr(session_handler_module, "ClaudeSDKClient", _StubClaudeSDKClient)
+    monkeypatch.setattr(session_handler_module.os, "name", "nt", raising=False)
+    monkeypatch.setenv("CLAUDE_RESOURCES_PATH", r"C:\Claude")
+    native_exe = os.path.join(
+        r"C:\Claude",
+        "app.asar.unpacked",
+        "claudecodeui",
+        "node_modules",
+        "@anthropic-ai",
+        "claude-code-win32-x64",
+        "claude.exe",
+    )
+    monkeypatch.setattr(session_handler_module.os.path, "isfile", lambda path: path == native_exe)
+
+    controller = _Controller(tmp_path)
+    controller.config.claude.cli_path = "claude"
+    handler = SessionHandler(controller)
+    context = MessageContext(user_id="U123", channel_id="C123")
+
+    _run_session(handler, context)
+
+    assert captured["connected"] is True
+    assert captured["options"].cli_path == native_exe
 
 
 def test_session_handler_keeps_sdk_default_for_default_claude_binary(monkeypatch, tmp_path: Path) -> None:

@@ -7,6 +7,7 @@ import re
 import time
 from typing import Optional, Dict, Any, Tuple
 from uuid import uuid4
+from core.windows_claude import resolve_windows_claude_command
 from modules.im import MessageContext
 from modules.claude_sdk_compat import ClaudeSDKClient, ClaudeAgentOptions
 from modules.agents.native_sessions.base import build_resume_preview
@@ -252,6 +253,11 @@ class SessionHandler(BaseHandler):
             return None
 
         if normalized == "claude":
+            if os.name != "nt":
+                return None
+            resolved_command, _ = resolve_windows_claude_command()
+            if resolved_command and len(resolved_command) == 1:
+                return resolved_command[0]
             return None
 
         return os.path.expanduser(normalized)

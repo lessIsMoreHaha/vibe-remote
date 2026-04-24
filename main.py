@@ -8,6 +8,7 @@ import threading
 from config.paths import ensure_data_dirs, get_logs_dir
 from config.v2_config import V2Config
 from core.controller import Controller
+from core.windows_claude import resolve_windows_claude_command, resolve_windows_claude_command_from_bat
 from vibe.sentry_integration import init_sentry
 
 
@@ -55,60 +56,40 @@ def apply_claude_sdk_patches():
             buffer_size,
         )
 
-    # On Windows, shutil.which("claude") resolves to claude.bat.
-    # Python subprocess wraps .bat via cmd.exe /c, which buffers stdin/stdout
-    # and breaks the SDK's JSON pipe protocol (causes "control request timeout").
-    # Fix: intercept _build_command and expand .bat to node.exe + cli.js directly,
-    # matching the approach used by the Electron terminal mode.
     if os.name == "nt":
-        # Pre-resolve paths from CLAUDE_RESOURCES_PATH set by Electron,
-        # falling back to deriving from the .bat location via PATH.
         _resources_path = os.environ.get("CLAUDE_RESOURCES_PATH")
-        if _resources_path:
-            _resolved_node = os.path.join(_resources_path, "bin", "node", "node.exe")
-            _resolved_cli_js = os.path.join(_resources_path, "node_modules", "@anthropic-ai", "claude-code", "cli.js")
-            if os.path.isfile(_resolved_node) and os.path.isfile(_resolved_cli_js):
-                _win_node_exe = _resolved_node
-                _win_cli_js = _resolved_cli_js
-                logger.info("Windows CLI paths from CLAUDE_RESOURCES_PATH: %s", _resources_path)
-            else:
-                _win_node_exe = None
-                logger.warning(
-                    "CLAUDE_RESOURCES_PATH set but files missing "
-                    "(node=%s, cli=%s)", _resolved_node, _resolved_cli_js,
-                )
+        _resolved_windows_cmd, _ = resolve_windows_claude_command(_resources_path)
+        if _resolved_windows_cmd:
+            logger.info("Windows Claude command resolved from CLAUDE_RESOURCES_PATH: %s", _resolved_windows_cmd[0])
+        elif _resources_path:
+            logger.warning("CLAUDE_RESOURCES_PATH set but no packaged Claude command found: %s", _resources_path)
         else:
-            _win_node_exe = None
             logger.info("CLAUDE_RESOURCES_PATH not set, will derive from .bat location")
 
         _original_build_command = subprocess_cli.SubprocessCLITransport._build_command
 
         def _patched_build_command(self):
             cmd = _original_build_command(self)
-            if cmd and cmd[0].lower().endswith(".bat"):
-                if _win_node_exe:
-                    patched = [_win_node_exe, _win_cli_js] + cmd[1:]
-                    logger.info(
-                        "Windows .bat expanded via CLAUDE_RESOURCES_PATH: %s",
-                        patched[0],
-                    )
+            if not cmd:
+                return cmd
+            if cmd[0].lower().endswith(".bat"):
+                if _resolved_windows_cmd:
+                    patched = [*_resolved_windows_cmd, *cmd[1:]]
+                    logger.info("Windows .bat replaced with packaged Claude command: %s", patched[0])
                     return patched
-                from pathlib import Path as _P
-                bat_dir = str(_P(cmd[0]).resolve().parent)
-                node_exe = os.path.join(bat_dir, "node", "node.exe")
-                cli_js = os.path.normpath(os.path.join(bat_dir, "..", "node_modules", "@anthropic-ai", "claude-code", "cli.js"))
-                if os.path.isfile(node_exe) and os.path.isfile(cli_js):
-                    patched = [node_exe, cli_js] + cmd[1:]
+                fallback = resolve_windows_claude_command_from_bat(cmd[0])
+                if fallback:
+                    patched = [*fallback, *cmd[1:]]
                     logger.info("Windows .bat expanded via .bat location: %s", patched[0])
                     return patched
                 logger.warning(
-                    "Windows .bat detected but cannot resolve node.exe/cli.js "
-                    "(node_exe=%s, cli_js=%s)", node_exe, cli_js,
+                    "Windows .bat detected but cannot resolve packaged Claude command or node.exe/cli.js (bat=%s)",
+                    cmd[0],
                 )
             return cmd
 
         subprocess_cli.SubprocessCLITransport._build_command = _patched_build_command
-        logger.info("Patched SubprocessCLITransport._build_command for Windows .bat workaround")
+        logger.info("Patched SubprocessCLITransport._build_command for Windows Claude launch resolution")
 
         import subprocess as _sp
         _CREATE_NO_WINDOW = 0x08000000

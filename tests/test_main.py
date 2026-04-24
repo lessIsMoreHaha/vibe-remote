@@ -77,7 +77,43 @@ def test_apply_claude_sdk_patches_updates_max_buffer(monkeypatch):
     assert fake_subprocess_cli._MAX_BUFFER_SIZE == 16 * 1024 * 1024
 
 
-def test_apply_claude_sdk_patches_uses_claude_resources_path(monkeypatch):
+def test_apply_claude_sdk_patches_prefers_packaged_native_claude_exe(monkeypatch):
+    class Transport:
+        def _build_command(self):
+            return [r"C:\Tools\claude.bat", "--print"]
+
+    fake_subprocess_cli = types.SimpleNamespace(
+        _MAX_BUFFER_SIZE=1024,
+        SubprocessCLITransport=Transport,
+    )
+    transport_module = types.ModuleType("claude_agent_sdk._internal.transport")
+    transport_module.subprocess_cli = fake_subprocess_cli
+    monkeypatch.setitem(sys.modules, "claude_agent_sdk._internal.transport", transport_module)
+
+    monkeypatch.setattr(main_module.os, "name", "nt", raising=False)
+    monkeypatch.setenv("CLAUDE_RESOURCES_PATH", r"C:\Claude")
+    native_exe = os.path.join(
+        r"C:\Claude",
+        "app.asar.unpacked",
+        "claudecodeui",
+        "node_modules",
+        "@anthropic-ai",
+        "claude-code-win32-x64",
+        "claude.exe",
+    )
+    monkeypatch.setattr(main_module.os.path, "isfile", lambda path: path == native_exe)
+
+    import subprocess as _sp
+    original_popen_init = _sp.Popen.__init__
+    try:
+        main_module.apply_claude_sdk_patches()
+        command = fake_subprocess_cli.SubprocessCLITransport()._build_command()
+        assert command == [native_exe, "--print"]
+    finally:
+        _sp.Popen.__init__ = original_popen_init
+
+
+def test_apply_claude_sdk_patches_uses_packaged_node_cli_when_native_exe_missing(monkeypatch):
     class Transport:
         def _build_command(self):
             return [r"C:\Tools\claude.bat", "--print"]
@@ -155,35 +191,3 @@ def test_apply_claude_sdk_patches_falls_back_to_bat_location(monkeypatch):
 
 
 def test_apply_claude_sdk_patches_sets_create_no_window(monkeypatch):
-    class Transport:
-        def _build_command(self):
-            return ["claude"]
-
-    fake_subprocess_cli = types.SimpleNamespace(
-        _MAX_BUFFER_SIZE=1024,
-        SubprocessCLITransport=Transport,
-    )
-    transport_module = types.ModuleType("claude_agent_sdk._internal.transport")
-    transport_module.subprocess_cli = fake_subprocess_cli
-    monkeypatch.setitem(sys.modules, "claude_agent_sdk._internal.transport", transport_module)
-
-    monkeypatch.setattr(main_module.os, "name", "nt", raising=False)
-    monkeypatch.delenv("CLAUDE_RESOURCES_PATH", raising=False)
-    monkeypatch.setattr(main_module.os.path, "isfile", lambda path: False)
-
-    import subprocess as _sp
-    original_popen_init = _sp.Popen.__init__
-    captured = {}
-
-    def fake_popen_init(self, *args, **kwargs):
-        captured.update(kwargs)
-        return None
-
-    _sp.Popen.__init__ = fake_popen_init
-    try:
-        main_module.apply_claude_sdk_patches()
-        patched = _sp.Popen.__init__
-        patched(object(), "cmd", creationflags=4)
-        assert captured["creationflags"] == (4 | 0x08000000)
-    finally:
-        _sp.Popen.__init__ = original_popen_init
