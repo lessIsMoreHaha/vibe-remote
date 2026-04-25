@@ -14,9 +14,12 @@ from config.v2_config import (
     ClaudeConfig,
     CodexConfig,
     OpenCodeConfig,
+    PlatformsConfig,
     RuntimeConfig,
     SlackConfig,
+    UpdateConfig,
     V2Config,
+    WeChatConfig,
 )
 
 
@@ -93,14 +96,18 @@ def default_config():
     return V2Config(
         mode="self_host",
         version="v2",
-        slack=SlackConfig(bot_token="", app_token=""),
+        platform="wechat",
+        platforms=PlatformsConfig(enabled=["wechat"], primary="wechat"),
+        wechat=WeChatConfig(bot_token=""),
         runtime=RuntimeConfig(default_cwd=str(work_dir)),
         agents=AgentsConfig(
-            default_backend="opencode",
-            opencode=OpenCodeConfig(enabled=True, cli_path="opencode"),
+            default_backend="claude",
+            opencode=OpenCodeConfig(enabled=False, cli_path="opencode"),
             claude=ClaudeConfig(enabled=True, cli_path="claude"),
             codex=CodexConfig(enabled=False, cli_path="codex"),
         ),
+        update=UpdateConfig(auto_update=False),
+        language="zh",
     )
 
 
