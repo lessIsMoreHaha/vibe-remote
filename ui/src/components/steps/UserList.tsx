@@ -698,7 +698,6 @@ export const UserList: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    )}
                   </div>
                 )}
               </div>
