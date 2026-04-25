@@ -825,7 +825,6 @@ export const ChannelList: React.FC<ChannelListProps> = ({ data = {}, onNext, onB
         {sortedChannels.map((channel) => {
           const rawConfig = configs[channel.id] || {};
           const def = defaultConfig();
-          const defaultBackend = config.agents?.default_backend || 'claude';
           const channelConfig = {
             ...def,
             ...rawConfig,
@@ -839,7 +838,6 @@ export const ChannelList: React.FC<ChannelListProps> = ({ data = {}, onNext, onB
             // Preserve require_mention from rawConfig (can be null, true, or false)
             require_mention: rawConfig.require_mention !== undefined ? rawConfig.require_mention : def.require_mention,
           };
-          const effectiveBackend = 'claude';
 
           const effectiveCwd = channelConfig.custom_cwd || config.runtime?.default_cwd || '~/work';
           const claudeAgents = claudeAgentsByCwd[effectiveCwd] || [];

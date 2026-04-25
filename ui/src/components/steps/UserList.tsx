@@ -533,7 +533,6 @@ export const UserList: React.FC = () => {
         ) : (
           userEntries.map(([userId, userConfig]) => {
             const effectiveCwd = userConfig.custom_cwd || config.runtime?.default_cwd || '~/work';
-            const effectiveBackend = 'claude';
             const claudeAgents = claudeAgentsByCwd[effectiveCwd] || [];
             return (
               <div key={userId} className="p-4 hover:bg-neutral-50/50 transition-colors">
