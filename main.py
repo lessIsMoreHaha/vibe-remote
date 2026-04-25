@@ -12,8 +12,22 @@ from core.windows_claude import resolve_windows_claude_command, resolve_windows_
 from vibe.sentry_integration import init_sentry
 
 
+def _configure_stdout_encoding() -> None:
+    if os.name != "nt":
+        return
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except Exception:
+            pass
+
+
 def _build_logging_handlers(logs_dir: str) -> list[logging.Handler]:
-    handlers: list[logging.Handler] = [logging.FileHandler(f"{logs_dir}/vibe_remote.log")]
+    handlers: list[logging.Handler] = [logging.FileHandler(f"{logs_dir}/vibe_remote.log", encoding="utf-8")]
     if os.environ.get("VIBE_DISABLE_STDOUT_LOGGING", "").lower() not in {"1", "true", "yes"}:
         handlers.insert(0, logging.StreamHandler(sys.stdout))
     return handlers
@@ -29,6 +43,7 @@ def setup_logging(level: str = "INFO"):
 
     ensure_data_dirs()
     logs_dir = str(get_logs_dir())
+    _configure_stdout_encoding()
 
     logging.basicConfig(
         level=getattr(logging, level.upper()),
