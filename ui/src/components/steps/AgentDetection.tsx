@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, X, RefreshCw, Search, Settings, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, RefreshCw, Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { useApi } from '../../context/ApiContext';
@@ -16,22 +16,18 @@ type AgentState = {
   status?: 'unknown' | 'ok' | 'missing';
 };
 
-type PermissionState = 'idle' | 'loading' | 'success' | 'error';
 
 export const AgentDetection: React.FC<AgentDetectionProps> = ({ data, onNext, onBack }) => {
   const { t } = useTranslation();
   const api = useApi();
   const [checking, setChecking] = useState(false);
-  const [defaultBackend, setDefaultBackend] = useState<string>(data.default_backend || 'opencode');
+  const [defaultBackend, setDefaultBackend] = useState<string>(data.default_backend || 'claude');
   const [agents, setAgents] = useState<Record<string, AgentState>>(
-    data.agents || {
-      opencode: { enabled: true, cli_path: 'opencode', status: 'unknown' },
-      claude: { enabled: true, cli_path: 'claude', status: 'unknown' },
-      codex: { enabled: false, cli_path: 'codex', status: 'unknown' },
-    }
+    data.agents?.claude
+      ? { claude: data.agents.claude }
+      : { claude: { enabled: true, cli_path: 'claude', status: 'unknown' } }
   );
-  const [permissionState, setPermissionState] = useState<PermissionState>('idle');
-  const [permissionMessage, setPermissionMessage] = useState<string>('');
+
   // Per-agent install state to prevent race conditions
   const [installingAgents, setInstallingAgents] = useState<Record<string, boolean>>({});
   const [installResults, setInstallResults] = useState<Record<string, { ok: boolean; message: string; output?: string | null }>>({});
@@ -75,22 +71,6 @@ export const AgentDetection: React.FC<AgentDetectionProps> = ({ data, onNext, on
     }));
   };
 
-  const setupPermission = async () => {
-    setPermissionState('loading');
-    try {
-      const result = await api.opencodeSetupPermission();
-      if (result.ok) {
-        setPermissionState('success');
-        setPermissionMessage(result.message);
-      } else {
-        setPermissionState('error');
-        setPermissionMessage(result.message);
-      }
-    } catch (e) {
-      setPermissionState('error');
-      setPermissionMessage(String(e));
-    }
-  };
 
   const installAgent = async (name: string) => {
     // Prevent multiple concurrent installations
@@ -150,9 +130,7 @@ export const AgentDetection: React.FC<AgentDetectionProps> = ({ data, onNext, on
           onChange={(e) => setDefaultBackend(e.target.value)}
           className="mt-2 w-full bg-bg border border-border rounded px-3 py-2 text-sm"
         >
-          <option value="opencode">OpenCode {t('agentDetection.recommended')}</option>
           <option value="claude">ClaudeCode</option>
-          <option value="codex">Codex</option>
         </select>
       </div>
 
@@ -270,32 +248,6 @@ export const AgentDetection: React.FC<AgentDetectionProps> = ({ data, onNext, on
                           </pre>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {name === 'opencode' && agent.status === 'ok' && (
-                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800 mb-2">{t('agentDetection.permissionHint')}</p>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={setupPermission}
-                      disabled={permissionState === 'loading'}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50"
-                    >
-                      {permissionState === 'loading' ? (
-                        <RefreshCw size={14} className="animate-spin" />
-                      ) : (
-                        <Settings size={14} />
-                      )}
-                      {t('agentDetection.setupPermission')}
-                    </button>
-                    {permissionState === 'success' && (
-                      <span className="text-sm text-green-600">{permissionMessage}</span>
-                    )}
-                    {permissionState === 'error' && (
-                      <span className="text-sm text-red-600">{permissionMessage}</span>
                     )}
                   </div>
                 </div>

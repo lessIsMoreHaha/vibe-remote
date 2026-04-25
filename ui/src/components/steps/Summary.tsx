@@ -408,7 +408,7 @@ const buildConfigPayload = (data: any) => {
       default_cwd: data.default_cwd || data.runtime?.default_cwd || '_tmp',
     },
     agents: {
-      default_backend: data.default_backend || 'opencode',
+      default_backend: data.default_backend || 'claude',
       opencode: {
         // Preserve existing opencode config
         ...agents.opencode,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Welcome } from './steps/Welcome';
+// import { Welcome } from './steps/Welcome';
 // import { ModeSelection } from './steps/ModeSelection'; // temporarily hidden — SaaS mode not yet available
 import { PlatformSelection } from './steps/PlatformSelection';
 import { AgentDetection } from './steps/AgentDetection';
@@ -69,7 +69,7 @@ const buildConfigPayload = (data: any) => {
     default_cwd: data.default_cwd || data.runtime?.default_cwd || '.',
   },
   agents: {
-    default_backend: data.default_backend || 'opencode',
+    default_backend: data.default_backend || 'claude',
     opencode: {
       // Preserve existing opencode config
       ...data.agents?.opencode,
@@ -145,7 +145,7 @@ export const Wizard: React.FC = () => {
       : [];
 
     return [
-      { id: 'welcome', title: 'Welcome', component: Welcome },
+      // { id: 'welcome', title: 'Welcome', component: Welcome },
       // { id: 'mode', title: 'Mode', component: ModeSelection }, // temporarily hidden — SaaS mode not yet available
       { id: 'agents', title: 'Agents', component: AgentDetection },
       { id: 'platform', title: 'Platform', component: PlatformSelection },
